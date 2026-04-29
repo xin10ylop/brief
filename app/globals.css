@@ -16,6 +16,14 @@
   box-sizing: border-box;
 }
 
+input,
+textarea,
+button,
+select {
+  font-family: inherit;
+  color: inherit;
+}
+
 html,
 body {
   padding: 0;

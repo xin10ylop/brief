@@ -3,18 +3,16 @@ export type ChatMessage = {
   content: string;
 };
 
-export type IntakeQuestion =
-  | {
-      is_final: false;
-      question_text: string;
-      context_acknowledgment?: string;
-      input_type: 'open_text' | 'single_select' | 'multi_select';
-      options?: string[];
-    }
-  | {
-      is_final: true;
-      closing_message?: string;
-    };
+export type IntakeQuestion = {
+  question_text: string;
+  context_acknowledgment?: string;
+  input_type: 'open_text' | 'single_select' | 'multi_select';
+  options?: string[];
+};
+
+export type IntakeQuestionResponse = IntakeQuestion & {
+  area: string;
+};
 
 export type PolicyFlag = 'none' | 'high_risk' | 'prohibited';
 
@@ -22,10 +20,12 @@ export type ExtractedContext = {
   business_summary: string;
   industry_label: string;
   team_signals: string;
+  selected_areas?: string[];
   identified_workflows: string[];
   where_time_is_lost: string;
   ai_maturity: string;
   regulatory_constraints: string;
+  user_ideas?: string;
   accent_color_hex: string;
   policy: {
     flag: PolicyFlag;
@@ -34,6 +34,7 @@ export type ExtractedContext = {
 };
 
 export type Recommendation = {
+  area?: string;
   workflow_name: string;
   workflow_one_liner: string;
   current_state: string;
@@ -54,11 +55,6 @@ export type Recommendation = {
     reliable_for: string;
     will_struggle_with: string;
   };
-  first_90_days: {
-    day_30: string;
-    day_60: string;
-    day_90: string;
-  };
   technical: {
     surfaces: string[];
     primitives: string[];
@@ -66,17 +62,6 @@ export type Recommendation = {
     integrations: string[];
     complexity: 'small' | 'medium' | 'large';
   };
-};
-
-export type StrategicExclusion = {
-  workflow_name: string;
-  reasoning: string;
-  category:
-    | 'human_judgment_creates_value'
-    | 'relationship_critical'
-    | 'regulatory_constraint'
-    | 'team_expertise_is_product'
-    | 'too_early';
 };
 
 export type RecommendationOutput = {
@@ -87,17 +72,23 @@ export type RecommendationOutput = {
   };
   thesis_statement?: string;
   recommendations: Recommendation[];
-  strategic_exclusions: StrategicExclusion[];
   policy: {
     flag: PolicyFlag;
     required_safeguards?: string[];
   };
 };
 
+export type ChatTurn = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 export type SavedSession = {
   savedAt: number;
   description: string;
+  selectedAreas: string[];
   history: ChatMessage[];
   context: ExtractedContext;
   recommendation: RecommendationOutput;
+  chat?: ChatTurn[];
 };
