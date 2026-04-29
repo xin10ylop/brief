@@ -2,19 +2,31 @@
 
 import { ArrowUpRight, ChevronRight, FileText, Link2, RotateCcw } from 'lucide-react';
 import { TOKENS } from '@/lib/design/tokens';
-import type { ExtractedContext, RecommendationOutput } from '@/lib/types';
+import type {
+  ChatTurn,
+  ExtractedContext,
+  RecommendationOutput,
+} from '@/lib/types';
 import { WorkflowDetail } from './WorkflowDetail';
 import { TechnicalAccordion } from './TechnicalAccordion';
+import { PitchChat } from './PitchChat';
 
 type Props = {
   recommendation: RecommendationOutput;
   context: ExtractedContext;
+  chat: ChatTurn[];
+  onChatUpdate: (next: ChatTurn[]) => void;
   onReset: () => void;
 };
 
-export function Pitch({ recommendation, context, onReset }: Props) {
-  const { diagnosis, thesis_statement, recommendations, strategic_exclusions, policy } =
-    recommendation;
+export function Pitch({
+  recommendation,
+  context,
+  chat,
+  onChatUpdate,
+  onReset,
+}: Props) {
+  const { diagnosis, thesis_statement, recommendations, policy } = recommendation;
   const isNotNow = diagnosis.overall_recommendation === 'not_now';
   const date = new Date()
     .toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })
@@ -398,92 +410,10 @@ export function Pitch({ recommendation, context, onReset }: Props) {
         recommendations &&
         recommendations.map((rec, i) => <WorkflowDetail key={i} rec={rec} index={i} />)}
 
-      {/* Strategic exclusions */}
-      {strategic_exclusions && strategic_exclusions.length > 0 && (
-        <section
-          className="pitch-section fade-in"
-          style={{ background: TOKENS.surface, maxWidth: 'none' }}
-        >
-          <div style={{ maxWidth: 1100, margin: '0 auto', padding: 0 }}>
-            <div className="micro-label" style={{ marginBottom: 16 }}>
-              {isNotNow ? '02' : '04'} · Strategic exclusions
-            </div>
-            <h2
-              className="serif"
-              style={{
-                fontSize: 'clamp(36px, 5vw, 56px)',
-                lineHeight: 1.1,
-                fontWeight: 400,
-                margin: '0 0 32px 0',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              What we chose not to touch.
-            </h2>
-            <p
-              style={{
-                fontSize: 19,
-                lineHeight: 1.6,
-                color: TOKENS.inkSecondary,
-                maxWidth: 720,
-                marginBottom: 64,
-              }}
-            >
-              These are workflows where your team&apos;s expertise creates the business&apos;s
-              value. Compressing them with AI would make the business worse, not better.
-            </p>
-
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 0,
-                borderTop: `1px solid ${TOKENS.border}`,
-              }}
-            >
-              {strategic_exclusions.map((excl, i) => (
-                <div
-                  key={i}
-                  style={{
-                    padding: '32px 0',
-                    borderBottom: `1px solid ${TOKENS.border}`,
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 2fr',
-                    gap: 32,
-                  }}
-                >
-                  <div>
-                    <div
-                      className="serif"
-                      style={{ fontSize: 26, lineHeight: 1.2, marginBottom: 12 }}
-                    >
-                      {excl.workflow_name}
-                    </div>
-                    <div
-                      className="mono"
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: '0.08em',
-                        color: 'var(--accent)',
-                      }}
-                    >
-                      {excl.category.replace(/_/g, ' ').toUpperCase()}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 16, lineHeight: 1.6, color: TOKENS.ink }}>
-                    {excl.reasoning}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Honest assessment */}
       <section className="pitch-section fade-in">
         <div className="micro-label" style={{ marginBottom: 16 }}>
-          {isNotNow ? '03' : '05'} · Honest assessment
+          {isNotNow ? '02' : '04'} · Honest assessment
         </div>
         <div style={{ borderLeft: `3px solid var(--accent)`, paddingLeft: 32, maxWidth: 800 }}>
           <p
@@ -506,7 +436,7 @@ export function Pitch({ recommendation, context, onReset }: Props) {
       {!isNotNow && recommendations && recommendations.length > 0 && (
         <section className="pitch-section fade-in">
           <div className="micro-label" style={{ marginBottom: 16 }}>
-            06 · Technical appendix
+            05 · Technical appendix
           </div>
           <h2
             className="serif"
@@ -547,7 +477,7 @@ export function Pitch({ recommendation, context, onReset }: Props) {
       {/* Next steps */}
       <section className="pitch-section fade-in">
         <div className="micro-label" style={{ marginBottom: 16 }}>
-          {isNotNow ? '04' : '07'} · Next steps
+          {isNotNow ? '03' : '06'} · Next steps
         </div>
         <h2
           className="serif"
@@ -640,6 +570,15 @@ export function Pitch({ recommendation, context, onReset }: Props) {
           Claude implementations.
         </div>
       </section>
+
+      {!isNotNow && recommendations && recommendations.length > 0 && (
+        <PitchChat
+          recommendation={recommendation}
+          context={context}
+          chat={chat}
+          onChatUpdate={onChatUpdate}
+        />
+      )}
 
       <footer
         style={{

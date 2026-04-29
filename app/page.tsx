@@ -2,21 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { Landing } from '@/components/Landing';
+import { AreaSelection } from '@/components/AreaSelection';
 import { IntakeFlow } from '@/components/IntakeFlow';
 import { GeneratingState } from '@/components/GeneratingState';
 import { Pitch } from '@/components/Pitch';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { TOKENS } from '@/lib/design/tokens';
 import { clearSession, loadSession, saveSession } from '@/lib/storage';
+import { labelForArea, CUSTOM_AREA_ID } from '@/lib/areas';
 import type {
   ChatMessage,
+  ChatTurn,
   ExtractedContext,
   IntakeQuestion,
   RecommendationOutput,
   SavedSession,
 } from '@/lib/types';
 
-type View = 'landing' | 'intake' | 'generating' | 'pitch';
+type View = 'landing' | 'areas' | 'intake' | 'generating' | 'pitch';
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -34,11 +37,13 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 export default function HomePage() {
   const [view, setView] = useState<View>('landing');
   const [businessDescription, setBusinessDescription] = useState('');
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [intakeHistory, setIntakeHistory] = useState<ChatMessage[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<IntakeQuestion | null>(null);
   const [questionLoading, setQuestionLoading] = useState(false);
   const [extractedContext, setExtractedContext] = useState<ExtractedContext | null>(null);
   const [recommendation, setRecommendation] = useState<RecommendationOutput | null>(null);
+  const [chat, setChat] = useState<ChatTurn[]>([]);
   const [generatingStatus, setGeneratingStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
@@ -53,12 +58,20 @@ export default function HomePage() {
   const reset = () => {
     setView('landing');
     setBusinessDescription('');
+    setSelectedAreas([]);
     setIntakeHistory([]);
     setCurrentQuestion(null);
     setExtractedContext(null);
     setRecommendation(null);
+    setChat([]);
     setError(null);
     setGeneratingStatus('');
+  };
+
+  const startAreaSelection = (description: string) => {
+    setError(null);
+    setBusinessDescription(description);
+    setView('areas');
   };
 
   const fetchNextQuestion = async (history: ChatMessage[]) => {
@@ -77,10 +90,20 @@ export default function HomePage() {
     }
   };
 
-  const startIntake = async (description: string) => {
-    setError(null);
+  const startIntake = async (areaIds: string[], customText?: string) => {
+    setSelectedAreas(areaIds);
+    const labels = areaIds.map((id) => labelForArea(id));
+    const customLine =
+      areaIds.includes(CUSTOM_AREA_ID) && customText
+        ? `\n\nCustom idea from the user: ${customText}`
+        : '';
     const initialHistory: ChatMessage[] = [
-      { role: 'user', content: `Initial business description: ${description}` },
+      {
+        role: 'user',
+        content: `Initial business description: ${businessDescription}\n\nAreas selected for exploration: ${labels.join(
+          ', ',
+        )}${customLine}`,
+      },
     ];
     setIntakeHistory(initialHistory);
     setView('intake');
@@ -116,13 +139,16 @@ export default function HomePage() {
       setGeneratingStatus('Drafting your proposal');
       await new Promise((r) => setTimeout(r, 400));
       setRecommendation(rec);
+      setChat([]);
 
       const session: SavedSession = {
         savedAt: Date.now(),
         description: businessDescription,
+        selectedAreas,
         history,
         context,
         recommendation: rec,
+        chat: [],
       };
       saveSession(session);
       setSavedSession(session);
@@ -137,9 +163,11 @@ export default function HomePage() {
   const handleResume = () => {
     if (!savedSession) return;
     setBusinessDescription(savedSession.description);
+    setSelectedAreas(savedSession.selectedAreas || []);
     setIntakeHistory(savedSession.history);
     setExtractedContext(savedSession.context);
     setRecommendation(savedSession.recommendation);
+    setChat(savedSession.chat || []);
     setView('pitch');
   };
 
@@ -154,6 +182,23 @@ export default function HomePage() {
     reset();
   };
 
+  const handleChatUpdate = (next: ChatTurn[]) => {
+    setChat(next);
+    if (recommendation && extractedContext) {
+      const session: SavedSession = {
+        savedAt: Date.now(),
+        description: businessDescription,
+        selectedAreas,
+        history: intakeHistory,
+        context: extractedContext,
+        recommendation,
+        chat: next,
+      };
+      saveSession(session);
+      setSavedSession(session);
+    }
+  };
+
   return (
     <div style={{ ['--accent' as string]: accentColor } as React.CSSProperties}>
       {error && <ErrorBanner error={error} onDismiss={() => setError(null)} />}
@@ -162,10 +207,18 @@ export default function HomePage() {
         <Landing
           description={businessDescription}
           setDescription={setBusinessDescription}
-          onSubmit={startIntake}
+          onSubmit={startAreaSelection}
           savedSession={savedSession}
           onResume={handleResume}
           onDiscardSaved={handleDiscardSaved}
+        />
+      )}
+
+      {view === 'areas' && (
+        <AreaSelection
+          description={businessDescription}
+          onSubmit={startIntake}
+          onReset={reset}
         />
       )}
 
@@ -185,6 +238,8 @@ export default function HomePage() {
         <Pitch
           recommendation={recommendation}
           context={extractedContext}
+          chat={chat}
+          onChatUpdate={handleChatUpdate}
           onReset={handleResetFromPitch}
         />
       )}
