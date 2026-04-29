@@ -1,28 +1,35 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Check, RotateCcw } from 'lucide-react';
 import { TOKENS } from '@/lib/design/tokens';
-import type { ChatMessage, IntakeQuestion } from '@/lib/types';
+import type { ChatMessage, IntakeQuestionResponse } from '@/lib/types';
 
 type Props = {
   history: ChatMessage[];
-  currentQuestion: IntakeQuestion | null;
+  currentQuestion: IntakeQuestionResponse | null;
   loading: boolean;
+  selectedAreas: string[];
+  exploredAreas: string[];
+  catchAllKey: string;
   onAnswer: (answer: string) => void;
   onReset: () => void;
 };
 
-export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onReset }: Props) {
+export function IntakeFlow({
+  history,
+  currentQuestion,
+  loading,
+  selectedAreas,
+  exploredAreas,
+  catchAllKey,
+  onAnswer,
+  onReset,
+}: Props) {
   const [openText, setOpenText] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [otherText, setOtherText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  const userTurns = history.filter((m) => m.role === 'user');
-  const exchangeNum = userTurns.length;
-  const totalEstimate = 6;
-  const progress = Math.min(exchangeNum / totalEstimate, 0.95);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -36,7 +43,6 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
 
   const isOptionQuestion = Boolean(
     currentQuestion &&
-      !currentQuestion.is_final &&
       (currentQuestion.input_type === 'single_select' ||
         currentQuestion.input_type === 'multi_select'),
   );
@@ -45,8 +51,25 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
     (s) => s.toLowerCase().includes('something else') || s.toLowerCase().includes('other'),
   );
 
+  const totalSteps = selectedAreas.length + 1; // areas + catch-all
+  const isCatchAllPhase =
+    currentQuestion?.area === catchAllKey ||
+    (currentQuestion === null && exploredAreas.length >= selectedAreas.length);
+
+  const exploredAreaCount = selectedAreas.filter((a) => exploredAreas.includes(a)).length;
+  const completedSteps = exploredAreaCount + (exploredAreas.includes(catchAllKey) ? 1 : 0);
+  const currentStepNumber = isCatchAllPhase
+    ? selectedAreas.length + 1
+    : Math.min(exploredAreaCount + 1, selectedAreas.length);
+
+  const currentAreaLabel = useMemo(() => {
+    if (!currentQuestion) return null;
+    if (currentQuestion.area === catchAllKey) return 'Anything else';
+    return currentQuestion.area;
+  }, [currentQuestion, catchAllKey]);
+
   const handleSubmit = () => {
-    if (!currentQuestion || currentQuestion.is_final) return;
+    if (!currentQuestion) return;
     if (currentQuestion.input_type === 'open_text') {
       if (openText.trim().length < 5) return;
       onAnswer(openText.trim());
@@ -75,7 +98,7 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
   };
 
   const toggleSelect = (option: string) => {
-    if (!currentQuestion || currentQuestion.is_final) return;
+    if (!currentQuestion) return;
     if (currentQuestion.input_type === 'single_select') {
       setSelected([option]);
     } else {
@@ -87,9 +110,10 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
 
   const submitDisabled =
     !currentQuestion ||
-    currentQuestion.is_final ||
     (currentQuestion.input_type === 'open_text' && openText.trim().length < 5) ||
     (isOptionQuestion && selected.length === 0);
+
+  const progressFraction = totalSteps > 0 ? Math.min(completedSteps / totalSteps, 0.99) : 0;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -110,8 +134,11 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
             className="mono"
             style={{ fontSize: 11, color: TOKENS.inkSecondary, letterSpacing: '0.05em' }}
           >
-            INTAKE {String(Math.min(exchangeNum + 1, totalEstimate)).padStart(2, '0')} /{' '}
-            {String(totalEstimate).padStart(2, '0')}
+            {isCatchAllPhase
+              ? 'CATCH-ALL'
+              : `EXPLORING ${String(currentStepNumber).padStart(2, '0')} / ${String(
+                  selectedAreas.length,
+                ).padStart(2, '0')}`}
           </div>
           <button
             onClick={onReset}
@@ -137,11 +164,99 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
           style={{
             height: '100%',
             background: 'var(--accent)',
-            width: `${progress * 100}%`,
+            width: `${progressFraction * 100}%`,
             transition: 'width 0.4s ease',
           }}
         />
       </div>
+
+      {selectedAreas.length > 0 && (
+        <div
+          style={{
+            padding: '16px 48px',
+            borderBottom: `1px solid ${TOKENS.border}`,
+            background: TOKENS.surface,
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 1100,
+              margin: '0 auto',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+              alignItems: 'center',
+            }}
+          >
+            <span
+              className="mono"
+              style={{
+                fontSize: 10,
+                letterSpacing: '0.08em',
+                color: TOKENS.inkTertiary,
+                marginRight: 4,
+              }}
+            >
+              AREAS
+            </span>
+            {selectedAreas.map((area) => {
+              const done = exploredAreas.includes(area);
+              const active = currentQuestion?.area === area;
+              return (
+                <span
+                  key={area}
+                  style={{
+                    fontFamily: TOKENS.mono,
+                    fontSize: 11,
+                    padding: '4px 10px',
+                    border: `1px solid ${
+                      active ? 'var(--accent)' : done ? TOKENS.borderStrong : TOKENS.border
+                    }`,
+                    background: active ? 'var(--accent)' : 'transparent',
+                    color: active
+                      ? TOKENS.bg
+                      : done
+                      ? TOKENS.ink
+                      : TOKENS.inkSecondary,
+                    letterSpacing: '0.04em',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    opacity: !active && !done ? 0.7 : 1,
+                  }}
+                >
+                  {done && !active && <Check size={10} strokeWidth={3} />}
+                  {area}
+                </span>
+              );
+            })}
+            <span
+              style={{
+                fontFamily: TOKENS.mono,
+                fontSize: 11,
+                padding: '4px 10px',
+                border: `1px solid ${
+                  isCatchAllPhase
+                    ? 'var(--accent)'
+                    : exploredAreas.includes(catchAllKey)
+                    ? TOKENS.borderStrong
+                    : TOKENS.border
+                }`,
+                background: isCatchAllPhase ? 'var(--accent)' : 'transparent',
+                color: isCatchAllPhase
+                  ? TOKENS.bg
+                  : exploredAreas.includes(catchAllKey)
+                  ? TOKENS.ink
+                  : TOKENS.inkSecondary,
+                letterSpacing: '0.04em',
+                opacity: !isCatchAllPhase && !exploredAreas.includes(catchAllKey) ? 0.7 : 1,
+              }}
+            >
+              Anything else
+            </span>
+          </div>
+        </div>
+      )}
 
       <main
         style={{
@@ -152,14 +267,27 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
           width: '100%',
         }}
       >
+        {currentAreaLabel && !loading && (
+          <div
+            className="micro-label fade-in"
+            style={{ marginBottom: 24, color: 'var(--accent)' }}
+          >
+            Now exploring: {currentAreaLabel}
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
           {history.map((msg, i) => {
             if (msg.role === 'user') {
               const display = msg.content.startsWith('Initial business description: ')
-                ? msg.content.replace('Initial business description: ', '')
+                ? msg.content.split('\n')[0].replace('Initial business description: ', '')
                 : msg.content;
               return (
-                <div key={i} className="fade-in" style={{ alignSelf: 'flex-end', maxWidth: '85%' }}>
+                <div
+                  key={i}
+                  className="fade-in"
+                  style={{ alignSelf: 'flex-end', maxWidth: '85%' }}
+                >
                   <div
                     className="mono"
                     style={{
@@ -188,8 +316,7 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
               );
             }
             try {
-              const q = JSON.parse(msg.content) as IntakeQuestion;
-              if (q.is_final) return null;
+              const q = JSON.parse(msg.content) as IntakeQuestionResponse;
               return (
                 <div
                   key={i}
@@ -205,7 +332,7 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
                       letterSpacing: '0.06em',
                     }}
                   >
-                    BRIEF
+                    BRIEF{q.area && q.area !== catchAllKey ? ` · ${q.area}` : ''}
                   </div>
                   {q.context_acknowledgment && (
                     <div
@@ -232,7 +359,7 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
             }
           })}
 
-          {currentQuestion && !currentQuestion.is_final && !loading && (
+          {currentQuestion && !loading && (
             <div
               className="fade-in"
               style={{ alignSelf: 'flex-start', maxWidth: '90%', width: '100%' }}
@@ -247,6 +374,9 @@ export function IntakeFlow({ history, currentQuestion, loading, onAnswer, onRese
                 }}
               >
                 BRIEF
+                {currentQuestion.area && currentQuestion.area !== catchAllKey
+                  ? ` · ${currentQuestion.area}`
+                  : ''}
               </div>
               {currentQuestion.context_acknowledgment && (
                 <div

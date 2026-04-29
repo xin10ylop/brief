@@ -3,18 +3,16 @@ export type ChatMessage = {
   content: string;
 };
 
-export type IntakeQuestion =
-  | {
-      is_final: false;
-      question_text: string;
-      context_acknowledgment?: string;
-      input_type: 'open_text' | 'single_select' | 'multi_select';
-      options?: string[];
-    }
-  | {
-      is_final: true;
-      closing_message?: string;
-    };
+export type IntakeQuestion = {
+  question_text: string;
+  context_acknowledgment?: string;
+  input_type: 'open_text' | 'single_select' | 'multi_select';
+  options?: string[];
+};
+
+export type IntakeQuestionResponse = IntakeQuestion & {
+  area: string;
+};
 
 export type PolicyFlag = 'none' | 'high_risk' | 'prohibited';
 
@@ -56,11 +54,6 @@ export type Recommendation = {
   confidence: {
     reliable_for: string;
     will_struggle_with: string;
-  };
-  first_90_days: {
-    day_30: string;
-    day_60: string;
-    day_90: string;
   };
   technical: {
     surfaces: string[];

@@ -14,12 +14,14 @@ import type {
   ChatMessage,
   ChatTurn,
   ExtractedContext,
-  IntakeQuestion,
+  IntakeQuestionResponse,
   RecommendationOutput,
   SavedSession,
 } from '@/lib/types';
 
 type View = 'landing' | 'areas' | 'intake' | 'generating' | 'pitch';
+
+const CATCH_ALL_KEY = '__catch_all__';
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -37,9 +39,10 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 export default function HomePage() {
   const [view, setView] = useState<View>('landing');
   const [businessDescription, setBusinessDescription] = useState('');
-  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [selectedAreaLabels, setSelectedAreaLabels] = useState<string[]>([]);
+  const [exploredAreas, setExploredAreas] = useState<string[]>([]);
   const [intakeHistory, setIntakeHistory] = useState<ChatMessage[]>([]);
-  const [currentQuestion, setCurrentQuestion] = useState<IntakeQuestion | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<IntakeQuestionResponse | null>(null);
   const [questionLoading, setQuestionLoading] = useState(false);
   const [extractedContext, setExtractedContext] = useState<ExtractedContext | null>(null);
   const [recommendation, setRecommendation] = useState<RecommendationOutput | null>(null);
@@ -58,7 +61,8 @@ export default function HomePage() {
   const reset = () => {
     setView('landing');
     setBusinessDescription('');
-    setSelectedAreas([]);
+    setSelectedAreaLabels([]);
+    setExploredAreas([]);
     setIntakeHistory([]);
     setCurrentQuestion(null);
     setExtractedContext(null);
@@ -74,15 +78,30 @@ export default function HomePage() {
     setView('areas');
   };
 
-  const fetchNextQuestion = async (history: ChatMessage[]) => {
+  const fetchOrFinish = async (
+    history: ChatMessage[],
+    selectedLabels: string[],
+    explored: string[],
+  ) => {
+    const nextArea = selectedLabels.find((label) => !explored.includes(label)) ?? null;
+    const catchAllDone = explored.includes(CATCH_ALL_KEY);
+
+    if (nextArea === null && catchAllDone) {
+      await runExtractionAndRecommendation(history);
+      return;
+    }
+
     setQuestionLoading(true);
     try {
-      const parsed = await postJson<IntakeQuestion>('/api/intake-question', { history });
-      if (parsed.is_final) {
-        await runExtractionAndRecommendation(history);
-      } else {
-        setCurrentQuestion(parsed);
-      }
+      const phase = nextArea === null ? 'catch_all' : 'area_question';
+      const parsed = await postJson<IntakeQuestionResponse>('/api/intake-question', {
+        history,
+        selected_areas: selectedLabels,
+        explored_areas: explored,
+        current_area: nextArea,
+        phase,
+      });
+      setCurrentQuestion(parsed);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -91,8 +110,9 @@ export default function HomePage() {
   };
 
   const startIntake = async (areaIds: string[], customText?: string) => {
-    setSelectedAreas(areaIds);
     const labels = areaIds.map((id) => labelForArea(id));
+    setSelectedAreaLabels(labels);
+    setExploredAreas([]);
     const customLine =
       areaIds.includes(CUSTOM_AREA_ID) && customText
         ? `\n\nCustom idea from the user: ${customText}`
@@ -100,26 +120,32 @@ export default function HomePage() {
     const initialHistory: ChatMessage[] = [
       {
         role: 'user',
-        content: `Initial business description: ${businessDescription}\n\nAreas selected for exploration: ${labels.join(
+        content: `Initial business description: ${businessDescription}\n\nAreas selected for exploration (in this order): ${labels.join(
           ', ',
         )}${customLine}`,
       },
     ];
     setIntakeHistory(initialHistory);
     setView('intake');
-    await fetchNextQuestion(initialHistory);
+    await fetchOrFinish(initialHistory, labels, []);
   };
 
   const submitAnswer = async (answer: string) => {
-    if (!currentQuestion || currentQuestion.is_final) return;
+    if (!currentQuestion) return;
+    const justExplored = currentQuestion.area;
     const newHistory: ChatMessage[] = [
       ...intakeHistory,
       { role: 'assistant', content: JSON.stringify(currentQuestion) },
       { role: 'user', content: answer },
     ];
+    const newExplored = exploredAreas.includes(justExplored)
+      ? exploredAreas
+      : [...exploredAreas, justExplored];
+
     setIntakeHistory(newHistory);
+    setExploredAreas(newExplored);
     setCurrentQuestion(null);
-    await fetchNextQuestion(newHistory);
+    await fetchOrFinish(newHistory, selectedAreaLabels, newExplored);
   };
 
   const runExtractionAndRecommendation = async (history: ChatMessage[]) => {
@@ -144,7 +170,7 @@ export default function HomePage() {
       const session: SavedSession = {
         savedAt: Date.now(),
         description: businessDescription,
-        selectedAreas,
+        selectedAreas: selectedAreaLabels,
         history,
         context,
         recommendation: rec,
@@ -163,7 +189,7 @@ export default function HomePage() {
   const handleResume = () => {
     if (!savedSession) return;
     setBusinessDescription(savedSession.description);
-    setSelectedAreas(savedSession.selectedAreas || []);
+    setSelectedAreaLabels(savedSession.selectedAreas || []);
     setIntakeHistory(savedSession.history);
     setExtractedContext(savedSession.context);
     setRecommendation(savedSession.recommendation);
@@ -188,7 +214,7 @@ export default function HomePage() {
       const session: SavedSession = {
         savedAt: Date.now(),
         description: businessDescription,
-        selectedAreas,
+        selectedAreas: selectedAreaLabels,
         history: intakeHistory,
         context: extractedContext,
         recommendation,
@@ -227,6 +253,9 @@ export default function HomePage() {
           history={intakeHistory}
           currentQuestion={currentQuestion}
           loading={questionLoading}
+          selectedAreas={selectedAreaLabels}
+          exploredAreas={exploredAreas}
+          catchAllKey={CATCH_ALL_KEY}
           onAnswer={submitAnswer}
           onReset={reset}
         />

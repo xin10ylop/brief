@@ -188,50 +188,6 @@ export function WorkflowDetail({ rec, index }: { rec: Recommendation; index: num
         </div>
       </div>
 
-      <div
-        style={{ marginTop: 56, paddingTop: 32, borderTop: `1px solid ${TOKENS.border}` }}
-      >
-        <div
-          className="mono"
-          style={{
-            fontSize: 10,
-            color: TOKENS.inkTertiary,
-            letterSpacing: '0.08em',
-            marginBottom: 24,
-          }}
-        >
-          FIRST 90 DAYS
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: 24,
-          }}
-        >
-          {[
-            { label: 'DAY 30', text: rec.first_90_days?.day_30 },
-            { label: 'DAY 60', text: rec.first_90_days?.day_60 },
-            { label: 'DAY 90', text: rec.first_90_days?.day_90 },
-          ].map((item) => (
-            <div key={item.label} style={{ position: 'relative', paddingLeft: 0 }}>
-              <div
-                className="mono"
-                style={{
-                  fontSize: 11,
-                  color: 'var(--accent)',
-                  letterSpacing: '0.08em',
-                  marginBottom: 10,
-                  fontWeight: 500,
-                }}
-              >
-                {item.label}
-              </div>
-              <div style={{ fontSize: 14, lineHeight: 1.55, color: TOKENS.ink }}>{item.text}</div>
-            </div>
-          ))}
-        </div>
-      </div>
     </section>
   );
 }
