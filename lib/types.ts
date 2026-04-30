@@ -3,16 +3,34 @@ export type ChatMessage = {
   content: string;
 };
 
+export type IntakeInputType =
+  | 'open_text'
+  | 'single_select'
+  | 'multi_select'
+  | 'area_select';
+
+export type AreaOption = {
+  label: string;
+  helper?: string;
+};
+
 export type IntakeQuestion = {
   question_text: string;
   context_acknowledgment?: string;
-  input_type: 'open_text' | 'single_select' | 'multi_select';
+  input_type: IntakeInputType;
   options?: string[];
+  area_options?: AreaOption[];
 };
 
 export type IntakeQuestionResponse = IntakeQuestion & {
   area: string;
 };
+
+export type IntakePhase =
+  | 'opening'
+  | 'area_selection'
+  | 'area_question'
+  | 'catch_all';
 
 export type PolicyFlag = 'none' | 'high_risk' | 'prohibited';
 
