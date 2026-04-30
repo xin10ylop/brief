@@ -38,7 +38,7 @@ export function Landing({
           alignItems: 'center',
         }}
       >
-        <div className="serif" style={{ fontSize: 24, letterSpacing: '-0.01em' }}>
+        <div className="serif" style={{ fontSize: 40, letterSpacing: '-0.01em', lineHeight: 1 }}>
           Brief
           <span className="accent-text" style={{ marginLeft: 2 }}>.</span>
         </div>
@@ -139,9 +139,8 @@ export function Landing({
               color: TOKENS.ink,
             }}
           >
-            Where AI fits.
-            <br />
-            <em style={{ color: 'var(--accent)' }}>And where it doesn&apos;t.</em>
+            Where AI actually moves the needle in your{' '}
+            <em style={{ color: 'var(--accent)' }}>business.</em>
           </h1>
 
           <p
@@ -154,7 +153,7 @@ export function Landing({
               maxWidth: 560,
             }}
           >
-            Describe your business in a few sentences. Brief will ask a handful of focused questions, then produce a custom proposal naming the workflows where Claude can compress your team&apos;s time, the human role that retains authority over each one, and the workflows we wouldn&apos;t touch.
+            Describe your business. Brief will ask a few focused questions, then produce a custom proposal showing exactly where Claude can save your team time across customer support, finance, operations, sales, and more.
           </p>
 
           <form onSubmit={handleSubmit}>
@@ -200,18 +199,18 @@ export function Landing({
             {[
               {
                 num: '01',
-                title: 'Productivity, not replacement',
-                body: 'We target the slow parts of existing workflows. We do not model headcount changes.',
+                title: 'Specific, not generic',
+                body: 'Every recommendation is tailored to your actual workflows, not a template.',
               },
               {
                 num: '02',
-                title: 'Human always in the loop',
-                body: 'Every workflow names the specific person who retains decision authority.',
+                title: 'Human always in control',
+                body: "Every proposal names the specific person who reviews and approves Claude's output.",
               },
               {
                 num: '03',
-                title: 'Honest about the limits',
-                body: 'The proposal includes what we chose not to recommend, and why.',
+                title: 'Across every part of your business',
+                body: 'From customer support to finance to operations, wherever the opportunity is.',
               },
             ].map((card) => (
               <div key={card.num} style={{ borderTop: `1px solid ${TOKENS.border}`, paddingTop: 20 }}>

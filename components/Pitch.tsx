@@ -60,10 +60,10 @@ export function Pitch({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div className="serif" style={{ fontSize: 18 }}>
+          <div className="serif" style={{ fontSize: 30, lineHeight: 1, letterSpacing: '-0.01em' }}>
             Brief<span className="accent-text">.</span>
           </div>
-          <div style={{ width: 1, height: 16, background: TOKENS.borderStrong }} />
+          <div style={{ width: 1, height: 22, background: TOKENS.borderStrong }} />
           <div
             className="mono"
             style={{ fontSize: 11, color: TOKENS.inkSecondary, letterSpacing: '0.05em' }}

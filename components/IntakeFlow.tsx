@@ -154,7 +154,7 @@ export function IntakeFlow({
           alignItems: 'center',
         }}
       >
-        <div className="serif" style={{ fontSize: 22 }}>
+        <div className="serif" style={{ fontSize: 36, lineHeight: 1, letterSpacing: '-0.01em' }}>
           Brief<span className="accent-text">.</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
