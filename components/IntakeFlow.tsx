@@ -3,12 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Check, RotateCcw } from 'lucide-react';
 import { TOKENS } from '@/lib/design/tokens';
-import type { ChatMessage, IntakeQuestionResponse } from '@/lib/types';
+import type {
+  ChatMessage,
+  IntakePhase,
+  IntakeQuestionResponse,
+} from '@/lib/types';
 
 type Props = {
   history: ChatMessage[];
   currentQuestion: IntakeQuestionResponse | null;
   loading: boolean;
+  phase: IntakePhase;
   selectedAreas: string[];
   exploredAreas: string[];
   catchAllKey: string;
@@ -16,10 +21,25 @@ type Props = {
   onReset: () => void;
 };
 
+function phaseLabel(phase: IntakePhase, selectedAreas: string[], exploredAreas: string[]) {
+  if (phase === 'opening') return 'GETTING TO KNOW YOU';
+  if (phase === 'area_selection') return 'CHOOSE AREAS';
+  if (phase === 'catch_all') return 'CATCH-ALL';
+  if (phase === 'area_question') {
+    const exploredCount = selectedAreas.filter((a) => exploredAreas.includes(a)).length;
+    const total = selectedAreas.length;
+    return `EXPLORING ${String(Math.min(exploredCount + 1, total)).padStart(2, '0')} / ${String(
+      total,
+    ).padStart(2, '0')}`;
+  }
+  return '';
+}
+
 export function IntakeFlow({
   history,
   currentQuestion,
   loading,
+  phase,
   selectedAreas,
   exploredAreas,
   catchAllKey,
@@ -46,30 +66,35 @@ export function IntakeFlow({
       (currentQuestion.input_type === 'single_select' ||
         currentQuestion.input_type === 'multi_select'),
   );
+  const isAreaQuestion = currentQuestion?.input_type === 'area_select';
 
   const showOther = selected.some(
     (s) => s.toLowerCase().includes('something else') || s.toLowerCase().includes('other'),
   );
 
-  const totalSteps = selectedAreas.length + 1; // areas + catch-all
-  const isCatchAllPhase =
-    currentQuestion?.area === catchAllKey ||
-    (currentQuestion === null && exploredAreas.length >= selectedAreas.length);
-
-  const exploredAreaCount = selectedAreas.filter((a) => exploredAreas.includes(a)).length;
-  const completedSteps = exploredAreaCount + (exploredAreas.includes(catchAllKey) ? 1 : 0);
-  const currentStepNumber = isCatchAllPhase
-    ? selectedAreas.length + 1
-    : Math.min(exploredAreaCount + 1, selectedAreas.length);
+  const totalAreaSteps = selectedAreas.length + 1;
+  const completedAreaSteps =
+    selectedAreas.filter((a) => exploredAreas.includes(a)).length +
+    (exploredAreas.includes(catchAllKey) ? 1 : 0);
+  const progressFraction = (() => {
+    if (phase === 'opening') return 0.1;
+    if (phase === 'area_selection') return 0.25;
+    if (totalAreaSteps === 0) return 0.5;
+    return Math.min(0.3 + (completedAreaSteps / totalAreaSteps) * 0.7, 0.99);
+  })();
 
   const currentAreaLabel = useMemo(() => {
     if (!currentQuestion) return null;
     if (currentQuestion.area === catchAllKey) return 'Anything else';
+    if (currentQuestion.area === '__opening__' || currentQuestion.area === '__area_selection__') {
+      return null;
+    }
     return currentQuestion.area;
   }, [currentQuestion, catchAllKey]);
 
   const handleSubmit = () => {
     if (!currentQuestion) return;
+
     if (currentQuestion.input_type === 'open_text') {
       if (openText.trim().length < 5) return;
       onAnswer(openText.trim());
@@ -84,7 +109,10 @@ export function IntakeFlow({
       onAnswer(answer);
       return;
     }
-    if (currentQuestion.input_type === 'multi_select') {
+    if (
+      currentQuestion.input_type === 'multi_select' ||
+      currentQuestion.input_type === 'area_select'
+    ) {
       if (selected.length === 0) return;
       const hasOther = selected.some(
         (s) => s.toLowerCase().includes('something else') || s.toLowerCase().includes('other'),
@@ -111,9 +139,9 @@ export function IntakeFlow({
   const submitDisabled =
     !currentQuestion ||
     (currentQuestion.input_type === 'open_text' && openText.trim().length < 5) ||
-    (isOptionQuestion && selected.length === 0);
+    ((isOptionQuestion || isAreaQuestion) && selected.length === 0);
 
-  const progressFraction = totalSteps > 0 ? Math.min(completedSteps / totalSteps, 0.99) : 0;
+  const showChipRail = phase === 'area_question' || phase === 'catch_all';
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -134,11 +162,7 @@ export function IntakeFlow({
             className="mono"
             style={{ fontSize: 11, color: TOKENS.inkSecondary, letterSpacing: '0.05em' }}
           >
-            {isCatchAllPhase
-              ? 'CATCH-ALL'
-              : `EXPLORING ${String(currentStepNumber).padStart(2, '0')} / ${String(
-                  selectedAreas.length,
-                ).padStart(2, '0')}`}
+            {phaseLabel(phase, selectedAreas, exploredAreas)}
           </div>
           <button
             onClick={onReset}
@@ -170,7 +194,7 @@ export function IntakeFlow({
         />
       </div>
 
-      {selectedAreas.length > 0 && (
+      {showChipRail && selectedAreas.length > 0 && (
         <div
           style={{
             padding: '16px 48px',
@@ -236,20 +260,22 @@ export function IntakeFlow({
                 fontSize: 11,
                 padding: '4px 10px',
                 border: `1px solid ${
-                  isCatchAllPhase
+                  phase === 'catch_all'
                     ? 'var(--accent)'
                     : exploredAreas.includes(catchAllKey)
                     ? TOKENS.borderStrong
                     : TOKENS.border
                 }`,
-                background: isCatchAllPhase ? 'var(--accent)' : 'transparent',
-                color: isCatchAllPhase
-                  ? TOKENS.bg
-                  : exploredAreas.includes(catchAllKey)
-                  ? TOKENS.ink
-                  : TOKENS.inkSecondary,
+                background: phase === 'catch_all' ? 'var(--accent)' : 'transparent',
+                color:
+                  phase === 'catch_all'
+                    ? TOKENS.bg
+                    : exploredAreas.includes(catchAllKey)
+                    ? TOKENS.ink
+                    : TOKENS.inkSecondary,
                 letterSpacing: '0.04em',
-                opacity: !isCatchAllPhase && !exploredAreas.includes(catchAllKey) ? 0.7 : 1,
+                opacity:
+                  phase !== 'catch_all' && !exploredAreas.includes(catchAllKey) ? 0.7 : 1,
               }}
             >
               Anything else
@@ -262,7 +288,7 @@ export function IntakeFlow({
         style={{
           flex: 1,
           padding: '48px 24px 200px',
-          maxWidth: 720,
+          maxWidth: isAreaQuestion ? 1000 : 720,
           margin: '0 auto',
           width: '100%',
         }}
@@ -280,7 +306,7 @@ export function IntakeFlow({
           {history.map((msg, i) => {
             if (msg.role === 'user') {
               const display = msg.content.startsWith('Initial business description: ')
-                ? msg.content.split('\n')[0].replace('Initial business description: ', '')
+                ? msg.content.replace('Initial business description: ', '')
                 : msg.content;
               return (
                 <div
@@ -317,6 +343,11 @@ export function IntakeFlow({
             }
             try {
               const q = JSON.parse(msg.content) as IntakeQuestionResponse;
+              const showArea =
+                q.area &&
+                q.area !== '__opening__' &&
+                q.area !== '__area_selection__' &&
+                q.area !== catchAllKey;
               return (
                 <div
                   key={i}
@@ -332,7 +363,7 @@ export function IntakeFlow({
                       letterSpacing: '0.06em',
                     }}
                   >
-                    BRIEF{q.area && q.area !== catchAllKey ? ` · ${q.area}` : ''}
+                    BRIEF{showArea ? ` · ${q.area}` : ''}
                   </div>
                   {q.context_acknowledgment && (
                     <div
@@ -362,7 +393,7 @@ export function IntakeFlow({
           {currentQuestion && !loading && (
             <div
               className="fade-in"
-              style={{ alignSelf: 'flex-start', maxWidth: '90%', width: '100%' }}
+              style={{ alignSelf: 'flex-start', maxWidth: '95%', width: '100%' }}
             >
               <div
                 className="mono"
@@ -374,7 +405,10 @@ export function IntakeFlow({
                 }}
               >
                 BRIEF
-                {currentQuestion.area && currentQuestion.area !== catchAllKey
+                {currentQuestion.area &&
+                currentQuestion.area !== '__opening__' &&
+                currentQuestion.area !== '__area_selection__' &&
+                currentQuestion.area !== catchAllKey
                   ? ` · ${currentQuestion.area}`
                   : ''}
               </div>
@@ -446,6 +480,73 @@ export function IntakeFlow({
                       Pick all that apply
                     </div>
                   )}
+                </div>
+              )}
+
+              {isAreaQuestion && (
+                <div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                      gap: 12,
+                    }}
+                  >
+                    {(currentQuestion.area_options || []).map((opt) => {
+                      const isSelected = selected.includes(opt.label);
+                      return (
+                        <button
+                          key={opt.label}
+                          type="button"
+                          onClick={() => toggleSelect(opt.label)}
+                          className={`option-card ${isSelected ? 'selected' : ''}`}
+                          style={{ alignItems: 'flex-start', minHeight: 88 }}
+                        >
+                          <div className="check-icon" style={{ marginTop: 2 }}>
+                            {isSelected && <Check size={12} strokeWidth={3} />}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div
+                              style={{
+                                fontSize: 15,
+                                color: TOKENS.ink,
+                                marginBottom: opt.helper ? 6 : 0,
+                              }}
+                            >
+                              {opt.label}
+                            </div>
+                            {opt.helper && (
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  color: TOKENS.inkSecondary,
+                                  lineHeight: 1.45,
+                                }}
+                              >
+                                {opt.helper}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {showOther && (
+                    <input
+                      className="b-input"
+                      style={{ marginTop: 12 }}
+                      placeholder="Describe the area you want us to look at"
+                      value={otherText}
+                      onChange={(e) => setOtherText(e.target.value)}
+                      autoFocus
+                    />
+                  )}
+                  <div
+                    className="mono"
+                    style={{ fontSize: 11, color: TOKENS.inkTertiary, marginTop: 12 }}
+                  >
+                    Pick every area you want us to explore. We will dig into each one.
+                  </div>
                 </div>
               )}
 
